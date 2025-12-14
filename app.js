@@ -1,4 +1,4 @@
-const API = 'http://localhost:4000';
+const API = 'https://badminton-backend-9d2n.onrender.com';
 let token = '';
 let todayCompleted = false;
 
