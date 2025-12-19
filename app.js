@@ -2,6 +2,33 @@ const API = 'https://badminton-backend-9d2n.onrender.com';
 let token = '';
 let todayCompleted = false;
 
+/* ===== LOADING HELPERS ===== */
+function setButtonLoading(btn, isLoading, text) {
+  if (!btn) return;
+  if (isLoading) {
+    btn.dataset.origHtml = btn.innerHTML;
+    const spinner = '<span class="btn-spinner"><span class="spinner"></span></span>';
+    btn.innerHTML = spinner + (text || btn.dataset.loadingText || btn.dataset.origHtml || 'Đang xử lý...');
+    btn.classList.add('disabled-btn');
+    btn.disabled = true;
+  } else {
+    if (btn.dataset.origHtml) {
+      btn.innerHTML = btn.dataset.origHtml;
+      delete btn.dataset.origHtml;
+    }
+    btn.classList.remove('disabled-btn');
+    btn.disabled = false;
+  }
+}
+
+function showGlobalLoading(isLoading, msg) {
+  const el = document.getElementById('globalLoading');
+  if (!el) return;
+  el.style.display = isLoading ? 'flex' : 'none';
+  const t = el.querySelector('.loader-text');
+  if (t && msg !== undefined) t.innerText = msg;
+}
+
 // ==== LEVEL POPUP ====
 function openLevelPopup() { document.getElementById('levelModal').classList.add('show'); }
 function closeLevelPopup() { document.getElementById('levelModal').classList.remove('show'); }
@@ -30,6 +57,7 @@ function logout() {
 
 // ==== SIGNUP ====
 async function confirmSignup() {
+  const btn = document.getElementById('signupConfirmBtn');
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   const level = document.getElementById('signup-level').value;
@@ -40,6 +68,8 @@ async function confirmSignup() {
   }
 
   try {
+    setButtonLoading(btn, true, 'Đang đăng ký...');
+    showGlobalLoading(true, 'Đang đăng ký...');
     const res = await fetch(`${API}/auth/signup`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -47,7 +77,7 @@ async function confirmSignup() {
     });
     const data = await res.json();
     if (!res.ok) {
-      if (data.error.includes('tồn tại')) showMessage(data.error, true);
+      if (data.error && data.error.includes('tồn tại')) showMessage(data.error, true);
       else showMessage(data.error || 'Đăng ký thất bại');
       return;
     }
@@ -56,16 +86,22 @@ async function confirmSignup() {
   } catch (err) {
     console.error(err);
     showMessage('Không thể kết nối tới server');
+  } finally {
+    setButtonLoading(btn, false);
+    showGlobalLoading(false);
   }
-}
+} 
 
 // ==== LOGIN ====
 async function login() {
+  const btn = document.getElementById('loginSubmitBtn');
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   if (!username || !password) { showMessage('Vui lòng nhập tên đăng nhập và mật khẩu'); return; }
 
   try {
+    setButtonLoading(btn, true, 'Đang đăng nhập...');
+    showGlobalLoading(true, 'Đang đăng nhập...');
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -78,14 +114,17 @@ async function login() {
     document.getElementById('auth').style.display = 'none';
     document.getElementById('app').style.display = 'block';
 
-    loadWorkout();
-    loadUserInfo();
-    loadCalendar();
+    await loadWorkout();
+    await loadUserInfo();
+    await loadCalendar();
   } catch (err) {
     console.error(err);
     showMessage('Không thể kết nối tới server');
+  } finally {
+    setButtonLoading(btn, false);
+    showGlobalLoading(false);
   }
-}
+} 
 
 // ==== LOAD WORKOUT ====
 async function loadWorkout() {
@@ -117,7 +156,9 @@ async function loadWorkout() {
 // ==== COMPLETE WORKOUT ====
 async function complete() {
   if (todayCompleted) return;
+  const btn = document.getElementById('completeBtn');
   try {
+    setButtonLoading(btn, true, 'Đang cập nhật...');
     const res = await fetch(`${API}/workout/complete`, {
       method:'POST',
       headers:{'Authorization':'Bearer '+token}
@@ -125,9 +166,9 @@ async function complete() {
     const data = await res.json();
     if (data.success) {
       todayCompleted = true;
-      loadWorkout();
-      loadUserInfo();
-      loadCalendar();
+      await loadWorkout();
+      await loadUserInfo();
+      await loadCalendar();
       showMessage('Chúc mừng! Bạn đã hoàn thành bài tập hôm nay.');
     } else {
       showMessage(data.error || 'Không thể hoàn thành bài tập');
@@ -135,12 +176,16 @@ async function complete() {
   } catch (err) {
     console.error(err);
     showMessage('Không thể hoàn thành bài tập hôm nay');
+  } finally {
+    setButtonLoading(btn, false);
   }
-}
+} 
 
 // ==== LOAD USER INFO ====
 async function loadUserInfo() {
+  const updateBtn = document.getElementById('updateInfoBtn');
   try {
+    if (updateBtn) setButtonLoading(updateBtn, true, 'Đang tải...');
     const res = await fetch(`${API}/user/me`, {
       headers: { 'Authorization': 'Bearer ' + token }
     });
@@ -167,6 +212,8 @@ async function loadUserInfo() {
   } catch (err) {
     console.error(err);
     showMessage('Không thể tải thông tin tài khoản');
+  } finally {
+    if (updateBtn) setButtonLoading(updateBtn, false);
   }
 }
 

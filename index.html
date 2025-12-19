@@ -167,6 +167,53 @@
     .day.today {
       border: 2px solid #1976d2;
     }
+
+    /* ===== LOADING ===== 🔧 */
+    .spinner, .loader {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255,255,255,0.6);
+      border-top-color: rgba(255,255,255,1);
+      border-radius: 50%;
+      display: inline-block;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+
+    .btn-spinner {
+      margin-right: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.45);
+      z-index: 2000;
+      flex-direction: column;
+    }
+
+    .loader-box {
+      background: rgba(0,0,0,0.6);
+      padding: 14px 18px;
+      border-radius: 8px;
+      color: #fff;
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .loader-text {
+      font-size: 14px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
   </style>
 </head>
 
@@ -179,7 +226,7 @@
       <input id="username" placeholder="Tên đăng nhập">
       <input id="password" type="password" placeholder="Mật khẩu">
       <button class="center-btn" onclick="openLevelPopup()">Đăng ký</button>
-      <button class="center-btn" onclick="login()">Đăng nhập</button>
+      <button class="center-btn" id="loginSubmitBtn" onclick="login()">Đăng nhập</button>
     </div>
 
     <!-- LEVEL MODAL -->
@@ -192,7 +239,7 @@
           <option value="amateur">Nghiệp dư</option>
           <option value="pro">Chuyên nghiệp</option>
         </select>
-        <button onclick="confirmSignup()">Xác nhận</button>
+        <button id="signupConfirmBtn" onclick="confirmSignup()">Xác nhận</button>
         <button onclick="closeLevelPopup()">Hủy</button>
       </div>
     </div>
@@ -225,9 +272,16 @@
         <h3>Lịch luyện tập</h3>
         <div id="calendar" class="calendar"></div>
 
-        <button class="center-btn" onclick="loadUserInfo()">Cập nhật thông tin</button>
+        <button class="center-btn" id="updateInfoBtn" onclick="loadUserInfo()">Cập nhật thông tin</button>
         <button class="action-btn" onclick="logout()">Đăng xuất</button>
       </div>
+    </div>
+  </div>
+
+  <div id="globalLoading" class="loading-overlay">
+    <div class="loader-box">
+      <span class="loader"></span>
+      <span class="loader-text">Đang xử lý...</span>
     </div>
   </div>
 
