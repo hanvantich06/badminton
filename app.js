@@ -2,6 +2,86 @@ const API = 'https://badminton-backend-9d2n.onrender.com';
 let token = '';
 let todayCompleted = false;
 
+// Current logged in username (used for scoping local completion)
+let currentUser = '';
+
+function getLocalDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getLocalKey() {
+  if (!currentUser) return null; // don't fall back to global key to avoid cross-user leakage
+  return `completedDate_${currentUser}`;
+}
+
+function getLocalCompletedDate() {
+  try {
+    const key = getLocalKey();
+    if (!key) return null;
+    return localStorage.getItem(key);
+  } catch (e) { return null; }
+}
+
+function setLocalCompletedDate(dateStr) {
+  try {
+    const key = getLocalKey();
+    if (!key) return; // cannot set when username unknown
+    localStorage.setItem(key, dateStr);
+  } catch (e) { }
+}
+
+function clearLocalCompletedDate() {
+  try {
+    const key = getLocalKey();
+    if (!key) return;
+    localStorage.removeItem(key);
+  } catch (e) { }
+}
+
+/* ===== STREAK / COMPLETION HELPERS ===== */
+// compute streak ending at a specific date (YYYY-MM-DD). If endDateStr omitted, defaults to today.
+function computeStreakFromArray(completedDaysArr, endDateStr) {
+  const set = new Set(completedDaysArr || []);
+  // include local completion for today if present
+  const todayStr = getLocalDateStr();
+  const localDate = getLocalCompletedDate();
+  if (localDate === todayStr) set.add(todayStr);
+
+  // determine start date for checking
+  let d;
+  if (endDateStr) {
+    const parts = endDateStr.split('-').map(Number);
+    d = new Date(parts[0], parts[1] - 1, parts[2]);
+  } else {
+    d = new Date();
+  }
+
+  let streak = 0;
+  while (true) {
+    const s = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (set.has(s)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+function renderStreak(count) {
+  const el = document.getElementById('streak');
+  if (el) el.innerText = count;
+}
+
+function renderCompletionRate(monthlyCompleted) {
+  const daysSoFar = new Date().getDate();
+  const rate = daysSoFar ? Math.round((monthlyCompleted / daysSoFar) * 100) : 0;
+  const el = document.getElementById('completionRate');
+  if (el) el.innerText = rate + '%';
+  const bar = document.getElementById('completionBar');
+  if (bar) bar.style.width = Math.min(rate, 100) + '%';
+}
+
 /* ===== LOADING HELPERS ===== */
 function setButtonLoading(btn, isLoading, text) {
   if (!btn) return;
@@ -47,11 +127,21 @@ function openLogin() {
 }
 function logout() {
   token = ''; // xóa token
+  currentUser = '';
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth').style.display = 'block';
   // Reset các input và hiển thị mặc định
   document.getElementById('username').value = '';
   document.getElementById('password').value = '';
+  // Reset app UI
+  const btn = document.getElementById('completeBtn');
+  if (btn) {
+    btn.innerText = 'Hoàn thành bài hôm nay';
+    btn.classList.remove('disabled-btn');
+    btn.disabled = false;
+  }
+  renderStreak(0);
+  renderCompletionRate(0);
 }
 
 
@@ -114,8 +204,8 @@ async function login() {
     document.getElementById('auth').style.display = 'none';
     document.getElementById('app').style.display = 'block';
 
-    await loadWorkout();
     await loadUserInfo();
+    await loadWorkout();
     await loadCalendar();
   } catch (err) {
     console.error(err);
@@ -136,6 +226,16 @@ async function loadWorkout() {
     document.getElementById('user-level').innerText = 'Cấp độ: ' + data.level;
     document.getElementById('routine').innerText = data.routine || 'Chưa có bài tập hôm nay';
     todayCompleted = data.completed || false;
+
+    // Also respect a local completion record so the button stays disabled until tomorrow
+    const todayStr = getLocalDateStr();
+    const localDate = getLocalCompletedDate();
+    if (localDate === todayStr) {
+      todayCompleted = true;
+    } else if (localDate && localDate !== todayStr) {
+      // old entry - clear it
+      clearLocalCompletedDate();
+    }
 
     const btn = document.getElementById('completeBtn');
     if (todayCompleted) {
@@ -166,8 +266,11 @@ async function complete() {
     const data = await res.json();
     if (data.success) {
       todayCompleted = true;
-      await loadWorkout();
+      // ensure we have user info before persisting local completion
       await loadUserInfo();
+      // persist locally so the button remains disabled until tomorrow even across reloads
+      setLocalCompletedDate(getLocalDateStr());
+      await loadWorkout();
       await loadCalendar();
       showMessage('Chúc mừng! Bạn đã hoàn thành bài tập hôm nay.');
     } else {
@@ -196,6 +299,9 @@ async function loadUserInfo() {
       return;
     }
 
+    // set currentUser so local completion checks are scoped to this user
+    currentUser = data.username || '';
+
     document.getElementById('info-username').innerText = data.username;
     document.getElementById('info-level').innerText = data.level;
 
@@ -205,6 +311,9 @@ async function loadUserInfo() {
 
     document.getElementById('info-monthlyDays').innerText =
       data.monthlyCompleted + ' ngày';
+
+    // show official completion rate from server
+    renderCompletionRate(data.monthlyCompleted || 0);
 
     document.getElementById('info-totalDays').innerText =
       data.totalCompleted + ' ngày';
@@ -242,7 +351,7 @@ async function loadCalendar() {
       div.className = 'day';
       div.innerText = d;
 
-      if (completedDays.includes(dateStr)) {
+      if (completedDays.includes(dateStr) || (dateStr === todayStr && getLocalCompletedDate() === todayStr)) {
         div.classList.add('done');
       }
 
@@ -252,6 +361,24 @@ async function loadCalendar() {
 
       calendar.appendChild(div);
     }
+
+    // compute and render streak
+    // If today is completed (server or local), count streak up to today; otherwise count up to yesterday
+    const localDate = getLocalCompletedDate();
+    const completedToday = completedDays.includes(todayStr) || localDate === todayStr;
+    let streakEnd = todayStr;
+    if (!completedToday) {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      streakEnd = `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+    }
+    const streak = computeStreakFromArray(completedDays, streakEnd);
+    renderStreak(streak);
+
+    // derive monthly completed from calendar and render completion rate (this will be overridden by server value when available)
+    const monthPrefix = `${year}-${String(month + 1).padStart(2,'0')}`;
+    const monthlyCompletedFromCalendar = completedDays.filter(d => d.startsWith(monthPrefix)).length + (getLocalCompletedDate() === todayStr && !completedDays.includes(todayStr) ? 1 : 0);
+    renderCompletionRate(monthlyCompletedFromCalendar);
 
   } catch (err) {
     console.error(err);

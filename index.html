@@ -214,6 +214,23 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Progress bar for monthly completion */
+    .progress {
+      width: 100%;
+      max-width: 300px;
+      height: 12px;
+      background: #eee;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 8px auto;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg,#1976d2,#64b5f6);
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
   </style>
 </head>
 
@@ -267,6 +284,11 @@
         <p>Cấp độ: <span id="info-level"></span></p>
         <p>Số ngày luyện tháng này: <span id="info-monthlyDays">0</span></p>
         <p>Tổng số ngày đã luyện: <span id="info-totalDays">0</span></p>
+
+        <p>Chuỗi ngày liên tiếp: <strong id="streak">0</strong> ngày</p>
+        <p>Tỉ lệ hoàn thành tháng: <span id="completionRate">0%</span></p>
+        <div class="progress"><div id="completionBar" class="progress-bar" style="width:0%"></div></div>
+
         <p>Ngày bắt đầu: <span id="info-startedAt"></span></p>
 
         <h3>Lịch luyện tập</h3>
